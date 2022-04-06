@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  workspace:
+    build: ./build
+    image: jtmotox/docker-workspace
+    container_name: docker-workspace
+    hostname: docker-workspace
+    restart: always
+    env_file: .env
+    # network_mode: host
+    privileged: true
+    ports:
+      - "4445:4445"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # CODE-SERVER MAC
+      - "$HOME/Library/Application Support/Code/User:/root/.local/share/code-server/User"
+      - "$HOME/.vscode/extensions:/root/.local/share/code-server/extensions"

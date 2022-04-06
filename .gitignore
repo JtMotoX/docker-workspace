@@ -1,0 +1,6 @@
+/.env
+
+/build/code-server-cert/*
+
+
+!**/.gitkeep
