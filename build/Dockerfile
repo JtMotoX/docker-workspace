@@ -35,6 +35,13 @@ FROM base_image as final_image
 RUN TZ=America/Los_Angeles && \
 	ln -snf /usr/share/zoneinfo/$TZ /etc/localtime
 
+# CREATE HOME DIRECTORY
+ARG USER_NAME=dw
+ARG USER_ID=1000
+ARG USER_HOME=/home/dw
+RUN useradd --create-home --home-dir "${USER_HOME}" --uid ${USER_ID} ${USER_NAME}
+WORKDIR "${USER_HOME}"
+
 # ALLOW COLOR IN TERMINAL
 ENV TERM=xterm-256color
 
@@ -57,6 +64,8 @@ RUN apt-get update && \
 		procps \
 		git \
 		ca-certificates \
+		net-tools \
+		iproute2 \
 		&& \
 	rm -rf /var/lib/apt/lists/*
 
@@ -67,9 +76,11 @@ RUN apt-get update && \
 		ca-certificates \
 		tmux \
 		&& \
-	rm -rf /var/lib/apt/lists/* && \
-	git clone https://github.com/tmux-plugins/tmux-battery.git ~/.tmux/plugins/tmux-battery && \
+	rm -rf /var/lib/apt/lists/*
+USER ${USER_ID}
+RUN git clone https://github.com/tmux-plugins/tmux-battery.git ~/.tmux/plugins/tmux-battery && \
 	git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+USER root
 
 # SETUP ZSH
 RUN apt-get update && \
@@ -79,22 +90,30 @@ RUN apt-get update && \
 		ca-certificates \
 		&& \
 	rm -rf /var/lib/apt/lists/*
-RUN chsh -s $(which zsh)
-RUN sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
-	rm -rf /var/lib/apt/lists/*
+RUN chsh -s $(which zsh) ${USER_NAME}
+USER ${USER_ID}
+RUN sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 RUN echo "Installing oh-my-zsh themes and plugins . . ." && \
-	git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
-	git clone https://github.com/zsh-users/zsh-completions ~/.oh-my-zsh/custom/plugins/zsh-completions && \
-	git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting && \
-	git clone https://github.com/romkatv/powerlevel10k.git ~/.oh-my-zsh/custom/themes/powerlevel10k && \
-	git clone https://github.com/JtMotoX/zsh-jt-themes.git ~/.oh-my-zsh/custom/themes/zsh-jt-themes && \
+	cd ~/.oh-my-zsh/custom/themes && \
+	git clone https://github.com/romkatv/powerlevel10k.git && \
+	git clone https://github.com/JtMotoX/zsh-jt-themes.git && \
+	cd ~/.oh-my-zsh/custom/plugins && \
+	git clone https://github.com/zsh-users/zsh-autosuggestions && \
+	git clone https://github.com/zsh-users/zsh-completions && \
+	git clone https://github.com/zsh-users/zsh-syntax-highlighting.git && \
 	echo "done"
+USER root
+
+RUN ls -l /home/dw/.local/share/code-server -d || true
 
 # INSTALL CODE-SERVER
 ARG CODE_SERVER_VERSION=4.2.0
-COPY ./code-server-cert /root/.config/code-server/cert
+COPY ./code-server-cert ${USER_HOME}/.config/code-server/cert
+RUN chown -R ${USER_ID} ${USER_HOME}/.config/code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version ${CODE_SERVER_VERSION} && \
 	rm -rf /var/lib/apt/lists/*
+
+RUN ls -l /home/dw/.local/share/code-server -d || true
 
 # ADD PYTHON
 COPY --from=builder /opt/python /opt/python
@@ -105,10 +124,13 @@ RUN ln -s /opt/python/bin/python3 /usr/local/bin/python && \
 
 # ADD PYTHON MODULES
 COPY ./requirements.txt /tmp/requirements.txt
+USER ${USER_ID}
 RUN pip install wheel
 RUN pip install -r /tmp/requirements.txt
+USER root
 
 # ADD DOTFILES
+USER ${USER_ID}
 RUN cd ~ && \
 	git clone https://github.com/JtMotoX/dotfiles.git dotfiles && \
 	ln -sf dotfiles/ansible.cfg .ansible.cfg && \
@@ -117,10 +139,13 @@ RUN cd ~ && \
 	ln -sf dotfiles/sh_profile_custom .sh_profile_custom && \
 	ln -sf dotfiles/tmux.conf .tmux.conf && \
 	ln -sf dotfiles/zshrc .zshrc
+USER root
 
 # COPY SCRIPTS
 COPY --chmod=755 ./scripts /scripts
 
-WORKDIR /root
+# # SET USER
+# USER ${USER_ID}
+# WORKDIR "${USER_HOME}"
 
 ENTRYPOINT ["/scripts/entrypoint.sh"]

@@ -1,5 +1,15 @@
 #!/bin/sh
 
+# useradd -d /home/dw jonathaf
+
+echo -e "pwd\npwd" | passwd dw
+/scripts/add-docker-group.sh
+su - dw
+
+mkdir -p /persistence
+rm -f ~/.zsh_history
+ln -s /persistence/.zsh_history ~/.zsh_history
+
 echo "Starting code-server . . ."
 [ "${CODE_SERVER_PWD}" = "" ] && CODE_SERVER_PWD=$(echo $RANDOM | md5sum | head -c 20; echo;)
 PASSWORD="${CODE_SERVER_PWD}" code-server \
@@ -7,8 +17,8 @@ PASSWORD="${CODE_SERVER_PWD}" code-server \
 	--auth="password" \
 	--disable-telemetry=true \
 	--disable-update-check=true \
-	--cert="/root/.config/code-server/cert/server.crt" \
-	--cert-key="/root/.config/code-server/cert/server.key" \
+	--cert="/home/dw/.config/code-server/cert/server.crt" \
+	--cert-key="/home/dw/.config/code-server/cert/server.key" \
 	>/dev/null 2>&1 &
 
 echo "Running . . ."
